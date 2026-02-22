@@ -1,0 +1,597 @@
+// Sahalat - Oman Tourism Platform
+// Prisma Schema - Production Ready
+// UUID primary keys, Soft Delete, Indexes
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== ENUMS ==============
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserTokenType {
+  OTP_VERIFY
+  PASSWORD_RESET
+  REFRESH
+}
+
+enum BookingStatus {
+  PENDING
+  PAID
+  CANCELLED
+  COMPLETED
+}
+
+enum DiscountType {
+  TRIP
+  CAR
+}
+
+enum DiscountValueType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum TripType {
+  MARINE   // بحرية
+  GROUP    // جماعية
+  INDIVIDUAL // فردية
+}
+
+// ============== USERS & AUTH ==============
+
+model User {
+  id         String   @id @default(uuid()) @db.Uuid
+  email      String   @unique
+  password   String   // Random hash for OAuth users
+  name       String
+  firstName  String?  @map("first_name")
+  lastName   String?  @map("last_name")
+  phone      String?
+  country    String?
+  googleId   String?  @unique @map("google_id")
+  role       Role     @default(USER)
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  // Relations
+  tokens       UserToken[]
+  tripBookings TripBooking[]
+  carBookings  CarBooking[]
+  tripReviews  TripReview[]
+  carReviews   CarReview[]
+  favorites    Favorite[]
+  couponUsages CouponUsage[]
+
+  @@index([email, deletedAt])
+  @@index([role])
+  @@index([googleId])
+}
+
+model UserToken {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  type      UserTokenType
+  tokenHash String        @map("token_hash") // hashed OTP or token
+  expiresAt DateTime      @map("expires_at")
+  createdAt DateTime      @default(now())
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([tokenHash])
+}
+
+// ============== TRIPS ==============
+
+model Trip {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  titleAr     String?  @map("title_ar")
+  description String?
+  descriptionAr String? @map("description_ar")
+  route       String?  // مسار الرحلة، مثال: مسقط - صحراء وهيبة
+  routeAr     String?  @map("route_ar")
+  tripType    TripType? @map("trip_type") // MARINE | GROUP | INDIVIDUAL
+  durationDays Int     @map("duration_days")
+  basePrice   Decimal  @map("base_price") @db.Decimal(10, 2)
+  maxParticipants Int? @map("max_participants")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  images        TripImage[]
+  features      TripFeature[]
+  itineraryDays TripItineraryDay[]
+  includedItems TripIncluded[]
+  excludedItems TripExcluded[]
+  meals         TripMeal[]
+  hotels        TripHotel[]
+  tripLandmarks TripLandmark[]
+  bookings      TripBooking[]
+  reviews       TripReview[]
+  favorites     Favorite[]
+
+  @@index([isActive, deletedAt])
+  @@index([basePrice])
+  @@index([tripType])
+}
+
+model TripFeature {
+  id           String   @id @default(uuid()) @db.Uuid
+  tripId       String   @map("trip_id") @db.Uuid
+  title        String
+  titleAr      String?  @map("title_ar")
+  description  String?
+  descriptionAr String? @map("description_ar")
+  icon         String?  // أيقونة أو اسم أيقونة
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+model TripItineraryDay {
+  id         String   @id @default(uuid()) @db.Uuid
+  tripId     String   @map("trip_id") @db.Uuid
+  dayNumber  Int      @default(1) @map("day_number") // اليوم (1 للرحلات اليومية)
+  duration   String?  // المدة: "1 hour", "45 min", "ساعة واحدة"
+  durationAr String?  @map("duration_ar")
+  title      String
+  titleAr    String?  @map("title_ar")
+  content    String?  @db.Text
+  contentAr  String?  @map("content_ar") @db.Text
+  extraInfo  String?  @map("extra_info") @db.Text // ✓ تذكرة دخول: 14$ (مشمولة)
+  extraInfoAr String? @map("extra_info_ar") @db.Text
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+model TripIncluded {
+  id        String   @id @default(uuid()) @db.Uuid
+  tripId    String   @map("trip_id") @db.Uuid
+  text      String   @db.Text
+  textAr    String?  @map("text_ar") @db.Text
+  icon      String?  // اسم أيقونة Lucide
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+model TripExcluded {
+  id        String   @id @default(uuid()) @db.Uuid
+  tripId    String   @map("trip_id") @db.Uuid
+  text      String   @db.Text
+  textAr    String?  @map("text_ar") @db.Text
+  icon      String?  // اسم أيقونة Lucide
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+model TripMeal {
+  id         String   @id @default(uuid()) @db.Uuid
+  tripId     String   @map("trip_id") @db.Uuid
+  dayNumber  Int      @map("day_number")
+  breakfast  String?
+  breakfastAr String? @map("breakfast_ar")
+  lunch      String?
+  lunchAr    String?  @map("lunch_ar")
+  dinner     String?
+  dinnerAr   String?  @map("dinner_ar")
+  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, dayNumber])
+  @@index([tripId])
+}
+
+model TripHotel {
+  id         String   @id @default(uuid()) @db.Uuid
+  tripId     String   @map("trip_id") @db.Uuid
+  nightNumber Int     @map("night_number")
+  hotelName  String   @map("hotel_name")
+  hotelNameAr String? @map("hotel_name_ar")
+  city       String?
+  cityAr     String?  @map("city_ar")
+  category   String?  // 5*, فاخر, ...
+  optionNumber Int    @default(1) @map("option_number")
+  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+model TripImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  tripId    String   @map("trip_id") @db.Uuid
+  imagePath String   @map("image_path")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
+
+// ============== LANDMARKS ==============
+
+model Landmark {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  nameAr      String?  @map("name_ar")
+  description String?
+  descriptionAr String? @map("description_ar")
+  location    String?
+  latitude    Decimal? @db.Decimal(10, 7)
+  longitude   Decimal? @db.Decimal(10, 7)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  images       LandmarkImage[]
+  tripLandmarks TripLandmark[]
+  favorites    Favorite[]
+
+  @@index([isActive, deletedAt])
+}
+
+model LandmarkImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  landmarkId  String   @map("landmark_id") @db.Uuid
+  imagePath   String   @map("image_path")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  deletedAt   DateTime?
+
+  landmark Landmark @relation(fields: [landmarkId], references: [id], onDelete: Cascade)
+
+  @@index([landmarkId])
+}
+
+model TripLandmark {
+  id         String   @id @default(uuid()) @db.Uuid
+  tripId     String   @map("trip_id") @db.Uuid
+  landmarkId String   @map("landmark_id") @db.Uuid
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+
+  trip     Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  landmark Landmark @relation(fields: [landmarkId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, landmarkId])
+  @@index([tripId])
+  @@index([landmarkId])
+}
+
+// ============== TRIP BOOKINGS & REVIEWS ==============
+
+model TripBooking {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  tripId        String        @map("trip_id") @db.Uuid
+  status        BookingStatus @default(PENDING)
+  startDate     DateTime      @map("start_date") @db.Date
+  participants  Int           @default(1)
+  adults        Int           @default(1) @map("adults")
+  children      Int           @default(0) @map("children")
+  basePrice     Decimal       @map("base_price") @db.Decimal(10, 2)
+  discountAmount Decimal      @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  couponAmount  Decimal      @default(0) @map("coupon_amount") @db.Decimal(10, 2)
+  finalPrice    Decimal       @map("final_price") @db.Decimal(10, 2)
+  couponId      String?       @map("coupon_id") @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  payment Payment?
+
+  @@index([userId])
+  @@index([tripId])
+  @@index([status])
+  @@index([startDate])
+}
+
+model TripReview {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tripId    String   @map("trip_id") @db.Uuid
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tripId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// ============== CARS ==============
+
+enum CarCategory {
+  ECONOMY
+  SUV
+  LUXURY
+  VAN
+}
+
+enum CarTransmission {
+  AUTOMATIC
+  MANUAL
+}
+
+enum CarFuelType {
+  PETROL
+  DIESEL
+}
+
+model Car {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  nameAr      String?  @map("name_ar")
+  description String?
+  descriptionAr String? @map("description_ar")
+  brand       String?
+  model       String?
+  year        Int?
+  basePricePerDay  Decimal  @map("base_price_per_day") @db.Decimal(10, 2)
+  basePricePerWeek Decimal? @map("base_price_per_week") @db.Decimal(10, 2)
+  basePricePerMonth Decimal? @map("base_price_per_month") @db.Decimal(10, 2)
+  basePricePerDayWithDriver  Decimal? @map("base_price_per_day_with_driver") @db.Decimal(10, 2)
+  basePricePerWeekWithDriver Decimal? @map("base_price_per_week_with_driver") @db.Decimal(10, 2)
+  basePricePerMonthWithDriver Decimal? @map("base_price_per_month_with_driver") @db.Decimal(10, 2)
+  category    CarCategory @default(ECONOMY)
+  transmission CarTransmission @default(AUTOMATIC)
+  seats       Int      @default(5)
+  fuelType    CarFuelType? @map("fuel_type")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  images     CarImage[]
+  bookings   CarBooking[]
+  reviews    CarReview[]
+  favorites  Favorite[]
+
+  @@index([isActive, deletedAt])
+  @@index([basePricePerDay])
+  @@index([category])
+  @@index([transmission])
+}
+
+model CarImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  carId     String   @map("car_id") @db.Uuid
+  imagePath String   @map("image_path")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  car Car @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+}
+
+model CarBooking {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  carId           String        @map("car_id") @db.Uuid
+  status          BookingStatus @default(PENDING)
+  pickupLocation  String        @map("pickup_location")
+  returnLocation  String        @map("return_location")
+  startDate       DateTime      @map("start_date") @db.Date
+  endDate         DateTime      @map("end_date") @db.Date
+  withDriver     Boolean       @default(false) @map("with_driver")
+  licenseImagePath String?     @map("license_image_path")
+  licenseIssuer   String?      @map("license_issuer")
+  basePrice       Decimal      @map("base_price") @db.Decimal(10, 2)
+  discountAmount  Decimal      @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  couponAmount    Decimal     @default(0) @map("coupon_amount") @db.Decimal(10, 2)
+  finalPrice      Decimal     @map("final_price") @db.Decimal(10, 2)
+  couponId        String?     @map("coupon_id") @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  car    Car    @relation(fields: [carId], references: [id], onDelete: Restrict)
+  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  payment Payment?
+
+  @@index([userId])
+  @@index([carId])
+  @@index([status])
+  @@index([startDate])
+}
+
+model CarReview {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  carId     String   @map("car_id") @db.Uuid
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  car  Car  @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, carId])
+  @@index([carId])
+  @@index([userId])
+}
+
+// ============== FAVORITES ==============
+
+model Favorite {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  tripId      String?  @map("trip_id") @db.Uuid
+  carId       String?  @map("car_id") @db.Uuid
+  landmarkId  String?  @map("landmark_id") @db.Uuid
+  createdAt   DateTime @default(now())
+  deletedAt   DateTime?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip    Trip?    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  car     Car?     @relation(fields: [carId], references: [id], onDelete: Cascade)
+  landmark Landmark? @relation(fields: [landmarkId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tripId, carId, landmarkId])
+  @@index([userId])
+  @@index([tripId])
+  @@index([carId])
+  @@index([landmarkId])
+}
+
+// ============== DISCOUNTS (Admin) ==============
+
+model Discount {
+  id           String           @id @default(uuid()) @db.Uuid
+  type         DiscountType     // TRIP | CAR
+  referenceId  String           @map("reference_id") @db.Uuid
+  discountType DiscountValueType @map("discount_type") // PERCENTAGE | FIXED
+  value        Decimal          @db.Decimal(10, 2)
+  startDate    DateTime         @map("start_date") @db.Date
+  endDate      DateTime         @map("end_date") @db.Date
+  isActive     Boolean          @default(true) @map("is_active")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+
+  // referenceId points to Trip.id or Car.id based on type - resolved in service layer
+  @@index([type, referenceId])
+  @@index([startDate, endDate])
+  @@index([isActive])
+}
+
+// ============== COUPONS ==============
+
+model Coupon {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique
+  discountType  DiscountValueType @map("discount_type") // PERCENTAGE | FIXED
+  value         Decimal  @db.Decimal(10, 2)
+  minBookingAmount Decimal? @map("min_booking_amount") @db.Decimal(10, 2)
+  maxUsages     Int?     @map("max_usages")
+  usedCount     Int      @default(0) @map("used_count")
+  expiresAt     DateTime @map("expires_at")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  usages    CouponUsage[]
+  tripBookings TripBooking[]
+  carBookings  CarBooking[]
+
+  @@index([code])
+  @@index([expiresAt, isActive])
+}
+
+model CouponUsage {
+  id          String   @id @default(uuid()) @db.Uuid
+  couponId    String   @map("coupon_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  bookingType String   @map("booking_type") // TRIP_BOOKING | CAR_BOOKING
+  bookingId   String   @map("booking_id") @db.Uuid
+  discountAmount Decimal @map("discount_amount") @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([userId])
+}
+
+// ============== PAYMENTS (Thawani) ==============
+
+model Payment {
+  id                 String        @id @default(uuid()) @db.Uuid
+  tripBookingId      String?       @unique @map("trip_booking_id") @db.Uuid
+  carBookingId       String?       @unique @map("car_booking_id") @db.Uuid
+  amount             Decimal       @db.Decimal(10, 2)
+  currency           String        @default("OMR")
+  status             PaymentStatus @default(PENDING)
+  providerSessionId  String?       @map("provider_session_id")
+  providerPaymentId  String?       @map("provider_payment_id")
+  metadata           Json?         // Thawani metadata
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
+
+  tripBooking TripBooking? @relation(fields: [tripBookingId], references: [id], onDelete: Restrict)
+  carBooking  CarBooking?  @relation(fields: [carBookingId], references: [id], onDelete: Restrict)
+  webhookLogs WebhookLog[]
+
+  @@index([providerSessionId])
+  @@index([status])
+}
+
+model WebhookLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  paymentId String?  @map("payment_id") @db.Uuid
+  event     String
+  payload   Json
+  signature String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([paymentId])
+  @@index([event])
+}
