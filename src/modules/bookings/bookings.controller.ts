@@ -154,4 +154,32 @@ export const bookingsController = {
       next(e);
     }
   },
+
+  async adminUpdateTripBookingStatus(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const bookingId = req.params.bookingId as string;
+      const status = req.body.status as 'PENDING' | 'PAID' | 'CANCELLED' | 'COMPLETED';
+      if (!['PENDING', 'PAID', 'CANCELLED', 'COMPLETED'].includes(status)) {
+        throw new AppError('Invalid status', 400);
+      }
+      const booking = await bookingsService.adminUpdateTripBookingStatus(bookingId, status);
+      res.json({ success: true, data: booking });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async adminUpdateCarBookingStatus(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const bookingId = req.params.bookingId as string;
+      const status = req.body.status as 'PENDING' | 'PAID' | 'CANCELLED' | 'COMPLETED';
+      if (!['PENDING', 'PAID', 'CANCELLED', 'COMPLETED'].includes(status)) {
+        throw new AppError('Invalid status', 400);
+      }
+      const booking = await bookingsService.adminUpdateCarBookingStatus(bookingId, status);
+      res.json({ success: true, data: booking });
+    } catch (e) {
+      next(e);
+    }
+  },
 };

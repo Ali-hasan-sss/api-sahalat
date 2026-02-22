@@ -12,7 +12,7 @@ import type { Prisma } from '@prisma/client';
 
 export const tripsService = {
   async list(query: ListTripsQuery) {
-    const { page, limit, isActive, minPrice, maxPrice, landmarkId } = query;
+    const { page, limit, isActive, minPrice, maxPrice, landmarkId, tripType } = query;
     const skip = (page - 1) * limit;
     const where: Prisma.TripWhereInput = { deletedAt: null };
     if (isActive !== undefined) where.isActive = isActive === 'true';
@@ -23,6 +23,9 @@ export const tripsService = {
     }
     if (landmarkId) {
       where.tripLandmarks = { some: { landmarkId, deletedAt: null } };
+    }
+    if (tripType) {
+      where.tripType = tripType as 'MARINE' | 'GROUP' | 'INDIVIDUAL';
     }
 
     const [items, total] = await Promise.all([

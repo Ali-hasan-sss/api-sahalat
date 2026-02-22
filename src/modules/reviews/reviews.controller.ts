@@ -3,6 +3,38 @@ import { reviewsService } from './reviews.service.js';
 import type { AuthRequest } from '../../middlewares/auth.middleware.js';
 
 export const reviewsController = {
+  async getFeaturedReviews(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const limit = Number((req.query as { limit?: string }).limit) || 10;
+      const items = await reviewsService.getFeaturedReviews(limit);
+      res.json({ success: true, data: items });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async listAllForAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await reviewsService.listAllForAdmin();
+      res.json({ success: true, data: result });
+    } catch (e) {
+      next(e);
+    }
+  },
+
+  async updateFeaturedBatch(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const body = req.body as { tripReviewIds?: string[]; carReviewIds?: string[] };
+      await reviewsService.updateFeaturedBatch(
+        body.tripReviewIds ?? [],
+        body.carReviewIds ?? []
+      );
+      res.json({ success: true });
+    } catch (e) {
+      next(e);
+    }
+  },
+
   async createTripReview(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;

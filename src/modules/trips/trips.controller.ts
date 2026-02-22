@@ -18,6 +18,7 @@ export const tripsController = {
         minPrice: req.query.minPrice != null ? Number(req.query.minPrice) : undefined,
         maxPrice: req.query.maxPrice != null ? Number(req.query.maxPrice) : undefined,
         landmarkId: typeof req.query.landmarkId === 'string' ? req.query.landmarkId : undefined,
+        tripType: (typeof req.query.tripType === 'string' && ['MARINE', 'GROUP', 'INDIVIDUAL'].includes(req.query.tripType) ? req.query.tripType : undefined) as 'MARINE' | 'GROUP' | 'INDIVIDUAL' | undefined,
       };
       const result = await tripsService.list(query);
       res.json({ success: true, data: result });

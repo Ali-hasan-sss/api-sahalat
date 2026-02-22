@@ -86,4 +86,135 @@ export const reviewsService = {
     });
     return { items, total, page, limit, averageRating: avg._avg.rating ?? 0, totalReviews: avg._count };
   },
+
+  /** Public: get featured reviews for homepage slider */
+  async getFeaturedReviews(limit = 10) {
+    const [tripReviews, carReviews] = await Promise.all([
+      prisma.tripReview.findMany({
+        where: { isFeatured: true, deletedAt: null, comment: { not: null } },
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, country: true } },
+          trip: { select: { id: true, title: true, titleAr: true } },
+        },
+      }),
+      prisma.carReview.findMany({
+        where: { isFeatured: true, deletedAt: null, comment: { not: null } },
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, country: true } },
+          car: { select: { id: true, name: true, nameAr: true } },
+        },
+      }),
+    ]);
+    const items = [
+      ...tripReviews.map((r) => ({
+        id: r.id,
+        type: 'TRIP' as const,
+        rating: r.rating,
+        comment: r.comment,
+        userName: r.user.name,
+        userCountry: r.user.country,
+        referenceTitle: r.trip.titleAr ?? r.trip.title,
+        referenceId: r.tripId,
+      })),
+      ...carReviews.map((r) => ({
+        id: r.id,
+        type: 'CAR' as const,
+        rating: r.rating,
+        comment: r.comment,
+        userName: r.user.name,
+        userCountry: r.user.country,
+        referenceTitle: r.car.nameAr ?? r.car.name,
+        referenceId: r.carId,
+      })),
+    ].filter((r) => r.comment != null && r.comment.trim().length > 0);
+    return items;
+  },
+
+  /** Admin: list all reviews for featured management */
+  async listAllForAdmin() {
+    const [tripReviews, carReviews] = await Promise.all([
+      prisma.tripReview.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, country: true } },
+          trip: { select: { id: true, title: true, titleAr: true } },
+        },
+      }),
+      prisma.carReview.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, country: true } },
+          car: { select: { id: true, name: true, nameAr: true } },
+        },
+      }),
+    ]);
+    const items = [
+      ...tripReviews.map((r) => ({
+        id: r.id,
+        type: 'TRIP' as const,
+        rating: r.rating,
+        comment: r.comment,
+        isFeatured: r.isFeatured,
+        createdAt: r.createdAt,
+        userName: r.user.name,
+        userCountry: r.user.country,
+        referenceTitle: r.trip.titleAr ?? r.trip.title,
+        referenceId: r.tripId,
+      })),
+      ...carReviews.map((r) => ({
+        id: r.id,
+        type: 'CAR' as const,
+        rating: r.rating,
+        comment: r.comment,
+        isFeatured: r.isFeatured,
+        createdAt: r.createdAt,
+        userName: r.user.name,
+        userCountry: r.user.country,
+        referenceTitle: r.car.nameAr ?? r.car.name,
+        referenceId: r.carId,
+      })),
+    ].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return { items };
+  },
+
+  async setTripReviewFeatured(id: string, isFeatured: boolean) {
+    const r = await prisma.tripReview.findFirst({ where: { id, deletedAt: null } });
+    if (!r) throw new AppError('Trip review not found', 404);
+    return prisma.tripReview.update({ where: { id }, data: { isFeatured } });
+  },
+
+  async setCarReviewFeatured(id: string, isFeatured: boolean) {
+    const r = await prisma.carReview.findFirst({ where: { id, deletedAt: null } });
+    if (!r) throw new AppError('Car review not found', 404);
+    return prisma.carReview.update({ where: { id }, data: { isFeatured } });
+  },
+
+  /** Admin: batch update featured status (review IDs) */
+  async updateFeaturedBatch(tripReviewIds: string[], carReviewIds: string[]) {
+    await prisma.tripReview.updateMany({
+      where: { id: { in: tripReviewIds }, deletedAt: null },
+      data: { isFeatured: true },
+    });
+    await prisma.tripReview.updateMany({
+      where: { id: { notIn: tripReviewIds }, deletedAt: null },
+      data: { isFeatured: false },
+    });
+    await prisma.carReview.updateMany({
+      where: { id: { in: carReviewIds }, deletedAt: null },
+      data: { isFeatured: true },
+    });
+    await prisma.carReview.updateMany({
+      where: { id: { notIn: carReviewIds }, deletedAt: null },
+      data: { isFeatured: false },
+    });
+  },
 };

@@ -20,5 +20,7 @@ router.get('/cars/:bookingId', bookingsController.getCarBooking);
 
 router.get('/admin/trips', requireAdmin, bookingsController.listAllTripBookings);
 router.get('/admin/cars', requireAdmin, bookingsController.listAllCarBookings);
+router.patch('/admin/trips/:bookingId/status', requireAdmin, bookingsController.adminUpdateTripBookingStatus);
+router.patch('/admin/cars/:bookingId/status', requireAdmin, bookingsController.adminUpdateCarBookingStatus);
 
 export const bookingsRoutes = router;

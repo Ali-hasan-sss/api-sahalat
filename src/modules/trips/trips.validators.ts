@@ -50,6 +50,7 @@ export const listTripsQuerySchema = z.object({
     minPrice: z.string().transform(Number).optional(),
     maxPrice: z.string().transform(Number).optional(),
     landmarkId: z.string().uuid().optional(),
+    tripType: tripTypeEnum.optional(),
   }),
 });
 

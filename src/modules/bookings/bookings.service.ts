@@ -428,7 +428,7 @@ export const bookingsService = {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { trip: { select: { id: true, title: true } }, user: { select: { id: true, email: true, name: true } } },
+        include: { trip: { select: { id: true, title: true, titleAr: true } }, user: { select: { id: true, email: true, name: true } } },
       }),
       prisma.tripBooking.count({ where: { deletedAt: null } }),
     ]);
@@ -443,10 +443,30 @@ export const bookingsService = {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { car: { select: { id: true, name: true } }, user: { select: { id: true, email: true, name: true } } },
+        include: { car: { select: { id: true, name: true, nameAr: true } }, user: { select: { id: true, email: true, name: true } } },
       }),
       prisma.carBooking.count({ where: { deletedAt: null } }),
     ]);
     return { items, total, page, limit };
+  },
+
+  async adminUpdateTripBookingStatus(bookingId: string, status: 'PENDING' | 'PAID' | 'CANCELLED' | 'COMPLETED') {
+    const booking = await prisma.tripBooking.findFirst({ where: { id: bookingId, deletedAt: null } });
+    if (!booking) throw new AppError('Booking not found', 404);
+    return prisma.tripBooking.update({
+      where: { id: bookingId },
+      data: { status },
+      include: { trip: { select: { id: true, title: true, titleAr: true } }, user: { select: { id: true, email: true, name: true } } },
+    });
+  },
+
+  async adminUpdateCarBookingStatus(bookingId: string, status: 'PENDING' | 'PAID' | 'CANCELLED' | 'COMPLETED') {
+    const booking = await prisma.carBooking.findFirst({ where: { id: bookingId, deletedAt: null } });
+    if (!booking) throw new AppError('Booking not found', 404);
+    return prisma.carBooking.update({
+      where: { id: bookingId },
+      data: { status },
+      include: { car: { select: { id: true, name: true, nameAr: true } }, user: { select: { id: true, email: true, name: true } } },
+    });
   },
 };
